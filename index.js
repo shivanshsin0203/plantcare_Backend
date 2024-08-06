@@ -14,7 +14,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 dotenv.config();
 const mongoUrl = process.env.mongoUrl;
-const port = process.env.port || 3006;
+const port = process.env.port || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors({
@@ -114,18 +114,24 @@ app.post('/plant', async (req, res) => {
 
   res.send('Plant added');
 });
-app.post('/upload', upload.single('photo'), async (req, res) => {
+app.post('/upload',  async (req, res) => {
   
     console.log("req recived")
-  if (!req.file) {
-    return res.status(400).send('No file uploaded.');
-  }
+    if (!req.body || !req.body.photo) {
+      return res.status(400).send('No file uploaded.');
+    }
 
   try {
+    const base64Data = req.body.photo.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    const imagePath = path.join(uploadsDir, `${Date.now()}.jpg`);
+    fs.writeFileSync(imagePath, buffer);
+
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const promptName = "What is this plant name in just 2-4 words is no plant then tell No plant found.";
     const promptDetails = "What is this plant? Tell me its details and what type it is in 6-8 lines.";
-    const imageParts = [fileToGenerativePart(req.file.path, 'image/jpeg')];
+    const imageParts = [fileToGenerativePart(imagePath, 'image/jpeg')];
     
     const resultDetail = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: promptDetails }, ...imageParts] }],
@@ -146,7 +152,9 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
     console.error(error);
     res.status(500).send('Something went wrong');
   } finally {
-    fs.unlinkSync(req.file.path); // Delete the file after processing
+    if (imagePath) {
+      fs.unlinkSync(imagePath); 
+    }// Delete the file after processing
   }
 });
 app.post('/getreq', async (req, res) => {
