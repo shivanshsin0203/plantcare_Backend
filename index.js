@@ -14,7 +14,7 @@ if (!fs.existsSync(uploadsDir)) {
 }
 dotenv.config();
 const mongoUrl = process.env.mongoUrl;
-const port = process.env.port || 3000;
+const port = process.env.port || 3006;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors({
