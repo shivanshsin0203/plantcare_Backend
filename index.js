@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const multer = require('multer');
 const fs = require('fs');
 const bodyParser = require("body-parser");
+const axios = require('axios');
 const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const path = require('path');
@@ -116,18 +117,27 @@ app.post('/plant', async (req, res) => {
 
   res.send('Plant added');
 });
-app.post('/upload', upload.single('photo'), async (req, res) => {
+app.post('/upload',  async (req, res) => {
   
     console.log("req recived")
-  if (!req.file) {
+  if (!req.body.imageURL) {
     return res.status(400).send('No file uploaded.');
   }
-
+   
   try {
+    const imageURL = req.body.imageURL;
+    console.log(`Fetching image from URL: ${imageURL}`);
+
+    // Fetch the image data from the provided URL
+    const response1 = await axios.get(imageURL, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response1.data, 'binary');
+
+    const tempFilePath = path.join(uploadsDir, `${Date.now()}.jpg`);
+    fs.writeFileSync(tempFilePath, buffer);
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const promptName = "What is this plant name in just 2-4 words is no plant then tell No plant found.";
     const promptDetails = "What is this plant? Tell me its details and what type it is in 6-8 lines.";
-    const imageParts = [fileToGenerativePart(req.file.path, 'image/jpeg')];
+    const imageParts = [fileToGenerativePart(tempFilePath, 'image/jpeg')];
     
     const resultDetail = await model.generateContent({
       contents: [{ role: 'user', parts: [{ text: promptDetails }, ...imageParts] }],
@@ -144,12 +154,11 @@ app.post('/upload', upload.single('photo'), async (req, res) => {
       details: responseDetails.text(),
     };
     res.json(response);
+    fs.unlinkSync(tempFilePath);
   } catch (error) {
     console.error(error);
     res.status(500).send('Something went wrong');
-  } finally {
-    fs.unlinkSync(req.file.path); // Delete the file after processing
-  }
+  } 
 });
 app.post('/getreq', async (req, res) => {
   console.log(req.body);
