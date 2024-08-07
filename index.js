@@ -17,6 +17,8 @@ const mongoUrl = process.env.mongoUrl;
 const port = process.env.port || 3000;
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({limit: '10mb'}));
+app.use(bodyParser.urlencoded({limit: '10mb', extended: true}));
 app.use(cors({
     origin: '*' 
   }));
@@ -40,7 +42,7 @@ app.use(cors({
     },
   });
   
-  const upload = multer({ storage: storage });
+  const upload = multer({ storage: storage,limits: { fileSize: 10 * 1024 * 1024 } });
   
   const genAI = new GoogleGenerativeAI(process.env.ApiKey);
   
