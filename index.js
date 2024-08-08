@@ -59,18 +59,27 @@ app.use(cors({
 app.get('/', (req, res) => {
   res.send('Hello World! from this docker');
 });
-app.post('/health', upload.single('photo'), async (req, res) => {
+app.post('/health',  async (req, res) => {
   
   console.log("req recived")
-if (!req.file) {
-  return res.status(400).send('No file uploaded.');
-}
+  if (!req.body.imageURL) {
+    return res.status(400).send('No file uploaded.');
+  }
 
 try {
+  const imageURL = req.body.imageURL;
+    console.log(`Fetching image from URL: ${imageURL}`);
+
+    // Fetch the image data from the provided URL
+    const response1 = await axios.get(imageURL, { responseType: 'arraybuffer' });
+    const buffer = Buffer.from(response1.data, 'binary');
+
+    const tempFilePath = path.join(uploadsDir, `${Date.now()}.jpg`);
+    fs.writeFileSync(tempFilePath, buffer);
   const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
   const promptName = "Here is image of plant. Tell it is healthy or not.If healthy then just say healthy if not then tell unhealthy.";
   const promptDetails = "If this plant is unhealthy then tell what is the problem in it and what is the solution in 6-8 lines.";
-  const imageParts = [fileToGenerativePart(req.file.path, 'image/jpeg')];
+  const imageParts = [fileToGenerativePart(tempFilePath, 'image/jpeg')];
   
   const resultDetail = await model.generateContent({
     contents: [{ role: 'user', parts: [{ text: promptDetails }, ...imageParts] }],
@@ -99,12 +108,11 @@ try {
     details: responseDetails.text(),
   };
   res.json(response);
+  fs.unlinkSync(tempFilePath);
 } catch (error) {
   console.error(error);
   res.status(500).send('Something went wrong');
-} finally {
-  fs.unlinkSync(req.file.path); // Delete the file after processing
-}
+} 
 });
 app.post('/plant', async (req, res) => {
   const namePlant = req.body.name.trim();
